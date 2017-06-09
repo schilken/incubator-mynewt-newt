@@ -75,7 +75,7 @@ ln -s "$installdir" "$repodir"
     GOPATH="$godir" GO15VENDOREXPERIMENT=1 go install
 
     mv "$godir"/bin/newt "$dstfile"
-
+    cp "$dstfile" ~/dev/go/bin
     printf "Successfully built executable: %s\n" "$dstfile"
 )
 

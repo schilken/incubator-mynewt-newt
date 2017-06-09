@@ -35,6 +35,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"sync"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -43,6 +44,11 @@ import (
 
 var Verbosity int
 var logFile *os.File
+var cmakeFile *os.File
+var includePaths = make(map[string]bool)
+var sourceFiles = make(map[string]bool)
+var mu1 sync.Mutex
+var mu2 sync.Mutex
 
 func ParseEqualsPair(v string) (string, string, error) {
 	s := strings.Split(v, "=")
@@ -229,6 +235,7 @@ func initLog(level log.Level, logFilename string) error {
 
 	return nil
 }
+
 
 // Initialize the util module
 func Init(logLevel log.Level, logFile string, verbosity int) error {
@@ -618,4 +625,60 @@ func IntMin(a, b int) int {
 	} else {
 		return b
 	}
+}
+
+/*
+	Collect include paths and source file names
+	Write CMakeFiles.txt
+ */
+
+func InitCMakefile() error {
+	var err error
+	cmakeFile, err = os.Create("CMakeLists.txt")
+	if err != nil {
+		return NewNewtError(err.Error())
+	}
+	return nil
+}
+
+
+func AddIncludePath(pathname string){
+	mu1.Lock()
+	if !includePaths[pathname] {
+		includePaths[pathname] = true
+	}
+	mu1.Unlock()
+}
+
+func AddSourceFile(filename string){
+	mu2.Lock()
+	if !sourceFiles[filename] {
+		sourceFiles[filename] = true
+	}
+	mu2.Unlock()
+}
+
+func HasSuffix(s, suffix string) bool {
+	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+}
+
+func ExportCMake(){
+	if cmakeFile == nil { return }
+	fmt.Print("writing CMakeLists.txt...")
+	fmt.Fprintf(cmakeFile, "cmake_minimum_required(VERSION 3.7)\n")
+	fmt.Fprintf(cmakeFile, "project(myproj)\n\n")
+	fmt.Fprintf(cmakeFile, "set(CMAKE_CXX_STANDARD 11)\n")
+	fmt.Fprintf(cmakeFile, "set(SOURCE_FILES\n")
+
+	for line, _ := range sourceFiles {
+		fmt.Fprintf(cmakeFile, "  %s\n", line)
+	}
+	fmt.Fprintf(cmakeFile, ")\n")
+	fmt.Fprintf(cmakeFile, "\n")
+
+	for line, _ := range includePaths {
+		fmt.Fprintf(cmakeFile, "include_directories(%s)\n", line)
+	}
+	fmt.Fprintf(cmakeFile, "add_executable(myproj ${SOURCE_FILES})\n")
+
 }

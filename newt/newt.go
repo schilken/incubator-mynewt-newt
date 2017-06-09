@@ -39,6 +39,7 @@ var newtVerbose bool
 var newtLogFile string
 var newtNumJobs int
 var newtHelp bool
+var newtMakefile bool
 
 func newtDfltNumJobs() int {
 	maxProcs := runtime.GOMAXPROCS(0)
@@ -85,8 +86,11 @@ func newtCmd() *cobra.Command {
 			} else if newtVerbose {
 				verbosity = util.VERBOSITY_VERBOSE
 			}
+			if newtMakefile {
+				util.InitCMakefile()
+			}
 
-			var err error
+				var err error
 			NewtLogLevel, err = log.ParseLevel(logLevelStr)
 			if err != nil {
 				cli.NewtUsage(nil, util.NewNewtError(err.Error()))
@@ -118,6 +122,8 @@ func newtCmd() *cobra.Command {
 		newtDfltNumJobs(), "Number of concurrent build jobs")
 	newtCmd.PersistentFlags().BoolVarP(&newtHelp, "help", "h",
 		false, "Help for newt commands")
+	newtCmd.PersistentFlags().BoolVarP(&newtMakefile, "make", "m",
+		false, "create CMakeFile.txt")
 
 	versHelpText := cli.FormatHelp(`Display the Newt version number`)
 	versHelpEx := "  newt version"
@@ -168,4 +174,5 @@ func main() {
 	}
 
 	cmd.Execute()
+	util.ExportCMake()
 }

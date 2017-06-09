@@ -333,6 +333,7 @@ func (c *Compiler) includesStrings() []string {
 	for i, s := range includes {
 		s = strings.TrimPrefix(filepath.ToSlash(filepath.Clean(s)), c.baseDir+"/")
 		tokens[i] = "-I" + s
+		util.AddIncludePath(s)
 	}
 
 	return tokens
@@ -508,6 +509,7 @@ func (c *Compiler) CompileFile(file string, compilerType int) error {
 	}
 
 	srcPath := strings.TrimPrefix(file, c.baseDir+"/")
+	util.AddSourceFile(srcPath)
 	switch compilerType {
 	case COMPILER_TYPE_C:
 		util.StatusMessage(util.VERBOSITY_DEFAULT, "Compiling %s\n", srcPath)
