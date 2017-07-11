@@ -43,6 +43,7 @@ import (
 )
 
 var Verbosity int
+var PrintShellCmds bool
 var logFile *os.File
 var cmakeFile *os.File
 var includePaths = make(map[string]bool)
@@ -254,6 +255,7 @@ func Init(logLevel log.Level, logFile string, verbosity int) error {
 	}
 
 	Verbosity = verbosity
+	PrintShellCmds = false
 
 	return nil
 }
@@ -298,6 +300,10 @@ func ShellCommandLimitDbgOutput(
 	}
 	log.Debugf("%s%s", envLogStr, strings.Join(cmdStrs, " "))
 
+	if PrintShellCmds {
+		StatusMessage(VERBOSITY_SILENT, "%s\n", strings.Join(cmdStrs, " "))
+	}
+
 	name := cmdStrs[0]
 	args := cmdStrs[1:]
 	cmd := exec.Command(name, args...)
@@ -307,6 +313,7 @@ func ShellCommandLimitDbgOutput(
 	}
 
 	o, err := cmd.CombinedOutput()
+
 	if maxDbgOutputChrs < 0 || len(o) <= maxDbgOutputChrs {
 		dbgStr := string(o)
 		log.Debugf("o=%s", dbgStr)
@@ -458,7 +465,7 @@ func MoveFile(srcFile string, destFile string) error {
 	}
 
 	if err := os.RemoveAll(srcFile); err != nil {
-		return err
+		return ChildNewtError(err)
 	}
 
 	return nil
@@ -470,7 +477,7 @@ func MoveDir(srcDir string, destDir string) error {
 	}
 
 	if err := os.RemoveAll(srcDir); err != nil {
-		return err
+		return ChildNewtError(err)
 	}
 
 	return nil
@@ -625,6 +632,12 @@ func IntMin(a, b int) int {
 	} else {
 		return b
 	}
+}
+
+func PrintStacks() {
+	buf := make([]byte, 1024*1024)
+	stacklen := runtime.Stack(buf, true)
+	fmt.Printf("*** goroutine dump\n%s\n*** end\n", buf[:stacklen])
 }
 
 /*

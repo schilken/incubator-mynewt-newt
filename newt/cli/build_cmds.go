@@ -104,10 +104,12 @@ func pkgToUnitTests(pack *pkg.LocalPackage) []*pkg.LocalPackage {
 var extraJtagCmd string
 var noGDB_flag bool
 
-func buildRunCmd(cmd *cobra.Command, args []string) {
+func buildRunCmd(cmd *cobra.Command, args []string, printShellCmds bool) {
 	if len(args) < 1 {
 		NewtUsage(cmd, nil)
 	}
+
+	util.PrintShellCmds = printShellCmds
 
 	TryGetProject()
 
@@ -140,7 +142,7 @@ func buildRunCmd(cmd *cobra.Command, args []string) {
 
 		// Look up the target by name.  This has to be done a second time here
 		// now that the project has been reset.
-		t := ResolveTarget(targets[i].Name())
+		t := ResolveTarget(targets[i].FullName())
 		if t == nil {
 			NewtUsage(nil, util.NewNewtError("Failed to resolve target: "+
 				targets[i].Name()))
@@ -389,11 +391,18 @@ func sizeRunCmd(cmd *cobra.Command, args []string, ram bool, flash bool) {
 }
 
 func AddBuildCommands(cmd *cobra.Command) {
+	var printShellCmds bool
+
 	buildCmd := &cobra.Command{
 		Use:   "build <target-name> [target-names...]",
 		Short: "Build one or more targets",
-		Run:   buildRunCmd,
+		Run: func(cmd *cobra.Command, args []string) {
+			buildRunCmd(cmd, args, printShellCmds)
+		},
 	}
+
+	buildCmd.Flags().BoolVarP(&printShellCmds, "printCmds", "p", false,
+		"Print executed build commands")
 
 	cmd.AddCommand(buildCmd)
 	AddTabCompleteFn(buildCmd, func() []string {
