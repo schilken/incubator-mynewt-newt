@@ -44,6 +44,7 @@ import (
 
 var Verbosity int
 var PrintShellCmds bool
+var ExecuteShell bool
 var logFile *os.File
 var cmakeFile *os.File
 var includePaths = make(map[string]bool)
@@ -256,6 +257,7 @@ func Init(logLevel log.Level, logFile string, verbosity int) error {
 
 	Verbosity = verbosity
 	PrintShellCmds = false
+	ExecuteShell = false
 
 	return nil
 }
@@ -293,6 +295,8 @@ func ReadConfig(path string, name string) (*viper.Viper, error) {
 // @return error                NewtError on failure.
 func ShellCommandLimitDbgOutput(
 	cmdStrs []string, env []string, maxDbgOutputChrs int) ([]byte, error) {
+	var name string
+	var args []string
 
 	envLogStr := ""
 	if env != nil {
@@ -304,8 +308,14 @@ func ShellCommandLimitDbgOutput(
 		StatusMessage(VERBOSITY_SILENT, "%s\n", strings.Join(cmdStrs, " "))
 	}
 
-	name := cmdStrs[0]
-	args := cmdStrs[1:]
+	if ExecuteShell && ((runtime.GOOS == "linux") || (runtime.GOOS == "darwin")) {
+		cmd := strings.Join(cmdStrs, " ")
+		name = "/bin/sh"
+		args = []string{"-c", strings.Replace(cmd, "\"", "\\\"", -1)}
+	} else {
+		name = cmdStrs[0]
+		args = cmdStrs[1:]
+	}
 	cmd := exec.Command(name, args...)
 
 	if env != nil {

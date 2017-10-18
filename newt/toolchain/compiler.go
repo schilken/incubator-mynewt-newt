@@ -60,6 +60,12 @@ type CompilerInfo struct {
 	IgnoreDirs  []*regexp.Regexp
 }
 
+type CompileCommand struct {
+	Directory string `json:"directory"`
+	Command   string `json:"command"`
+	File      string `json:"file"`
+}
+
 type Compiler struct {
 	objPathList   map[string]bool
 	LinkerScripts []string
@@ -95,7 +101,37 @@ type Compiler struct {
 	// common info set.  Ensures the local info only gets added once.
 	lclInfoAdded bool
 
+	compileCommands []CompileCommand
+
 	extraDeps []string
+}
+
+func (c *Compiler) GetCompileCommands() []CompileCommand {
+	return c.compileCommands
+}
+
+func (c *Compiler) GetCcPath() string {
+	return c.ccPath
+}
+
+func (c *Compiler) GetCppPath() string {
+	return c.cppPath
+}
+
+func (c *Compiler) GetAsPath() string {
+	return c.asPath
+}
+
+func (c *Compiler) GetArPath() string {
+	return c.arPath
+}
+
+func (c *Compiler) GetCompilerInfo() CompilerInfo {
+	return c.info
+}
+
+func (c *Compiler) GetLocalCompilerInfo() CompilerInfo {
+	return c.lclInfo
 }
 
 type CompilerJob struct {
@@ -188,12 +224,13 @@ func NewCompiler(compilerDir string, dstDir string,
 	buildProfile string) (*Compiler, error) {
 
 	c := &Compiler{
-		mutex:       &sync.Mutex{},
-		objPathList: map[string]bool{},
-		baseDir:     project.GetProject().BasePath,
-		srcDir:      "",
-		dstDir:      dstDir,
-		extraDeps:   []string{},
+		mutex:           &sync.Mutex{},
+		objPathList:     map[string]bool{},
+		baseDir:         project.GetProject().BasePath,
+		srcDir:          "",
+		dstDir:          dstDir,
+		extraDeps:       []string{},
+		compileCommands: []CompileCommand{},
 	}
 
 	c.depTracker = NewDepTracker(c)
@@ -525,6 +562,12 @@ func (c *Compiler) CompileFile(file string, compilerType int) error {
 	if err != nil {
 		return err
 	}
+
+	c.compileCommands = append(c.compileCommands,
+		CompileCommand{
+			Command: strings.Join(cmd, " "),
+			File:    file,
+		})
 
 	err = writeCommandFile(objPath, cmd)
 	if err != nil {

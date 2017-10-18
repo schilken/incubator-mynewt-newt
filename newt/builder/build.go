@@ -20,13 +20,16 @@
 package builder
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
 
 	"mynewt.apache.org/newt/newt/image"
+	"mynewt.apache.org/newt/newt/interfaces"
 	"mynewt.apache.org/newt/newt/newtutil"
 	"mynewt.apache.org/newt/newt/pkg"
 	"mynewt.apache.org/newt/newt/repo"
@@ -46,6 +49,7 @@ type Builder struct {
 	bspPkg           *BuildPackage
 	compilerPkg      *BuildPackage
 	targetPkg        *BuildPackage
+	testPkg          *BuildPackage
 	compilerInfo     *toolchain.CompilerInfo
 	targetBuilder    *TargetBuilder
 	cfg              syscfg.Cfg
@@ -308,6 +312,11 @@ func (b *Builder) collectCompileEntriesBpkg(bpkg *BuildPackage) (
 	return entries, nil
 }
 
+func (b *Builder) CollectCompileEntriesBpkg(bpkg *BuildPackage) (
+	[]toolchain.CompilerJob, error) {
+	return b.collectCompileEntriesBpkg(bpkg)
+}
+
 func (b *Builder) createArchive(c *toolchain.Compiler,
 	bpkg *BuildPackage) error {
 
@@ -444,8 +453,8 @@ func (b *Builder) PrepBuild() error {
 	baseCi.AddCompilerInfo(bspCi)
 
 	// All packages have access to the generated code header directory.
-	baseCi.Cflags = append(baseCi.Cflags,
-		"-I"+GeneratedIncludeDir(b.targetPkg.rpkg.Lpkg.Name()))
+	baseCi.Includes = append(baseCi.Includes,
+		GeneratedIncludeDir(b.targetPkg.rpkg.Lpkg.Name()))
 
 	// Note: Compiler flags get added at the end, after the flags for library
 	// package being built are calculated.
@@ -566,6 +575,35 @@ func (b *Builder) Build() error {
 				return err
 			}
 		}
+	}
+
+	var compileCommands []toolchain.CompileCommand
+
+	for _, bpkg := range bpkgs {
+		c := bpkgCompilerMap[bpkg]
+		if c != nil {
+			compileCommands = append(compileCommands,
+				c.GetCompileCommands()...)
+		}
+	}
+
+	projectPath := interfaces.GetProject().Path() + "/"
+	for i := range compileCommands {
+		compileCommands[i].Directory = projectPath
+	}
+
+	cmdBytes, err := json.MarshalIndent(compileCommands, "", "    ")
+	if err != nil {
+		log.Error("Unable to encode compilation commands as JSON")
+		return nil
+	}
+
+	cmdPath := b.CompileCmdsPath()
+	errWrite := ioutil.WriteFile(cmdPath, cmdBytes, 0644)
+	if errWrite != nil {
+		return util.FmtNewtError(
+			"Unable to write compile_commands.json file; reason: %s",
+			errWrite.Error())
 	}
 
 	return nil
@@ -721,6 +759,7 @@ func (b *Builder) CreateImage(version string,
 		}
 	}
 
+	img.HeaderSize = uint(b.targetBuilder.target.HeaderSize)
 	err = img.Generate(loaderImg)
 	if err != nil {
 		return nil, err

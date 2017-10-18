@@ -174,9 +174,9 @@ func (b *Builder) AppPath() string {
 	return b.PkgBinDir(b.appPkg) + "/"
 }
 
-func (b *Builder) TestExePath(bpkg *BuildPackage) string {
+func (b *Builder) TestExePath() string {
 	return TestExePath(b.targetPkg.rpkg.Lpkg.Name(), b.buildName,
-		bpkg.rpkg.Lpkg.Name(), bpkg.rpkg.Lpkg.Type())
+		b.testPkg.rpkg.Lpkg.Name(), b.testPkg.rpkg.Lpkg.Type())
 }
 
 func (b *Builder) ManifestPath() string {
@@ -187,4 +187,15 @@ func (b *Builder) ManifestPath() string {
 func (b *Builder) AppBinBasePath() string {
 	return b.PkgBinDir(b.appPkg) + "/" +
 		filepath.Base(b.appPkg.rpkg.Lpkg.Name())
+}
+
+func (b *Builder) CompileCmdsPath() string {
+	// The path depends on whether we are building an app or running a test.
+	var basePath string
+	if b.appPkg != nil {
+		basePath = filepath.Dir(b.AppElfPath())
+	} else {
+		basePath = filepath.Dir(b.TestExePath())
+	}
+	return basePath + "/compile_commands.json"
 }
